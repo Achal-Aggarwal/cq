@@ -238,8 +238,10 @@ func TestClaudeReportsCompletedStepsWhenALaterStepFails(t *testing.T) {
 }
 
 func TestClaudeInstallDryRunSkipsExecution(t *testing.T) {
+	t.Parallel()
+
 	var ran []recordedRun
-	h := claudeHost{run: recordRuns(&ran)}
+	h := claudeHost{lookPath: stubLookPath, run: recordRuns(&ran)}
 
 	changes, err := h.Install(Context{DryRun: true})
 	require.NoError(t, err)
@@ -249,7 +251,25 @@ func TestClaudeInstallDryRunSkipsExecution(t *testing.T) {
 	require.Empty(t, ran)
 }
 
+func TestClaudeDryRunFailsWhenCLIMissing(t *testing.T) {
+	t.Parallel()
+
+	h := claudeHost{
+		lookPath: func(string) (string, error) {
+			return "", errors.New("not found")
+		},
+	}
+
+	_, err := h.Install(Context{DryRun: true})
+	require.ErrorContains(t, err, "claude CLI not found on PATH")
+
+	_, err = h.Uninstall(Context{DryRun: true})
+	require.ErrorContains(t, err, "claude CLI not found on PATH")
+}
+
 func TestClaudeInstallPropagatesCommandFailure(t *testing.T) {
+	t.Parallel()
+
 	h := claudeHost{
 		lookPath: stubLookPath,
 		run: func(_ string, name string, _ ...string) ([]byte, error) {
@@ -263,6 +283,8 @@ func TestClaudeInstallPropagatesCommandFailure(t *testing.T) {
 }
 
 func TestClaudeInstallFailsWhenCLIMissing(t *testing.T) {
+	t.Parallel()
+
 	h := claudeHost{
 		lookPath: func(string) (string, error) {
 			return "", fmt.Errorf("not found")
