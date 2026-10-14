@@ -33,6 +33,7 @@ cq install --target cursor --target opencode
 | Flag          | Effect                                             |
 |---------------|----------------------------------------------------|
 | `--dry-run`   | Print the changes that would be made, without writing anything. |
+| `--project`   | Install into the given project directory instead of globally. Only the `claude` target supports this. |
 | `--uninstall` | Remove cq from the selected hosts.                 |
 
 ## What `cq install` sets up
@@ -70,11 +71,15 @@ Pick your host for the exact files `cq install` manages and how to point it at a
 Installed through Claude Code's own plugin marketplace. `cq install --target claude` runs:
 
 ```bash
-claude plugin marketplace add mozilla-ai/cq
-claude plugin install cq
+claude plugin marketplace add mozilla-ai/cq --scope user
+claude plugin install cq@cq --scope user
 ```
 
 The `claude` CLI must be on your `PATH`. cq does not write Claude config files directly; the plugin is managed by Claude Code.
+
+**Install for one project:** `cq install --target claude --project <dir>` runs the same commands from `<dir>` with `--scope project`. Claude Code records the plugin in `<dir>/.claude/settings.json`, which you can commit to share cq with your team. A project install uses the same local store as a global install, so knowledge is shared across projects unless you point a project at a different store with the local store variables in the [CLI configuration](../cli/README.md#configuration).
+
+A global `--uninstall` removes only the user-scope install. `--uninstall --project <dir>` removes only that project's install. If a project's settings enable cq but cq is not installed in that project on this machine, as in a fresh clone, `--uninstall --project <dir>` leaves the settings unchanged. Remove cq from `<dir>/.claude/settings.json` by hand in that case.
 
 **Point at a remote server** — add a top-level `env` block to `~/.claude/settings.json`:
 

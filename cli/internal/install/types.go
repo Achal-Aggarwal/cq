@@ -64,6 +64,12 @@ type Context struct {
 	// Home is the user's home directory.
 	Home string
 
+	// ProjectDir is the absolute project directory for a project install.
+	//
+	// Empty means a global install.
+	// NOTE: Callers must set it only for a host whose SupportsProject reports true.
+	ProjectDir string
+
 	// SkillsDir is the shared skills commons the skill is written into.
 	SkillsDir string
 
@@ -83,6 +89,8 @@ type Host interface {
 	GlobalTarget(home string) string
 
 	// Install writes cq into the host and reports per-step changes.
+	//
+	// On error, it may also return the changes of the steps that completed before the failure.
 	Install(ctx Context) ([]Change, error)
 
 	// Name is the host's stable identifier.
@@ -92,5 +100,7 @@ type Host interface {
 	SupportsProject() bool
 
 	// Uninstall removes cq from the host and reports per-step changes.
+	//
+	// On error, it may also return the changes of the steps that completed before the failure.
 	Uninstall(ctx Context) ([]Change, error)
 }

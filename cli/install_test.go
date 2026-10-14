@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -102,7 +103,84 @@ func TestInstallClaudeDryRun(t *testing.T) {
 	out, err := runInstall(t, "--target", "claude", "--dry-run")
 	require.NoError(t, err)
 	require.Contains(t, out, "[claude]")
-	require.Contains(t, out, "claude marketplace")
+	require.Contains(t, out, "claude marketplace  (user scope)")
+	require.Contains(t, out, "claude plugin  (user scope)")
+}
+
+func TestInstallClaudeProjectDryRun(t *testing.T) {
+	home := t.TempDir()
+	setTestHome(t, home)
+	bin := filepath.Join(t.TempDir(), "cq")
+	t.Setenv("CQ_INSTALL_BINARY", bin)
+
+	project := t.TempDir()
+	out, err := runInstall(t, "--target", "claude", "--project", project, "--dry-run")
+	require.NoError(t, err)
+	require.Contains(t, out, "[claude]")
+	require.Contains(t, out, "claude marketplace  (project scope: "+project+")")
+	require.Contains(t, out, "claude plugin  (project scope: "+project+")")
+}
+
+func TestInstallProjectRejectsMissingDirectory(t *testing.T) {
+	home := t.TempDir()
+	setTestHome(t, home)
+	bin := filepath.Join(t.TempDir(), "cq")
+	t.Setenv("CQ_INSTALL_BINARY", bin)
+
+	missing := filepath.Join(t.TempDir(), "missing")
+	_, err := runInstall(t, "--target", "claude", "--project", missing, "--dry-run")
+	require.ErrorContains(t, err, "project directory "+missing+" does not exist")
+}
+
+func TestInstallProjectRejectsEmptyDirectory(t *testing.T) {
+	home := t.TempDir()
+	setTestHome(t, home)
+	bin := filepath.Join(t.TempDir(), "cq")
+	t.Setenv("CQ_INSTALL_BINARY", bin)
+
+	out, err := runInstall(t, "--target", "claude", "--project=", "--dry-run")
+	require.ErrorContains(t, err, "--project needs a directory")
+	require.NotContains(t, out, "[claude]")
+}
+
+func TestInstallProjectRejectsHostWithoutProjectSupport(t *testing.T) {
+	home := t.TempDir()
+	setTestHome(t, home)
+	bin := filepath.Join(t.TempDir(), "cq")
+	t.Setenv("CQ_INSTALL_BINARY", bin)
+
+	_, err := runInstall(t, "--target", "cursor", "--project", t.TempDir(), "--dry-run")
+	require.ErrorContains(t, err, "host cursor does not support project installs")
+}
+
+func TestInstallProjectTouchesNoHostWhenAnyHostLacksProjectSupport(t *testing.T) {
+	home := t.TempDir()
+	setTestHome(t, home)
+	bin := filepath.Join(t.TempDir(), "cq")
+	t.Setenv("CQ_INSTALL_BINARY", bin)
+
+	out, err := runInstall(t, "--target", "claude", "--target", "cursor", "--project", t.TempDir(), "--dry-run")
+	require.ErrorContains(t, err, "host cursor does not support project installs")
+	require.NotContains(t, out, "[claude]")
+}
+
+func TestInstallClaudePrintsCompletedStepsBeforeAnError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake claude CLI is a shell script")
+	}
+	home := t.TempDir()
+	setTestHome(t, home)
+	bin := filepath.Join(t.TempDir(), "cq")
+	t.Setenv("CQ_INSTALL_BINARY", bin)
+	fake := t.TempDir()
+	script := "#!/bin/sh\nif [ \"$2\" = install ]; then exit 1; fi\nexit 0\n"
+	require.NoError(t, os.WriteFile(filepath.Join(fake, "claude"), []byte(script), 0o755))
+	t.Setenv("PATH", fake+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	out, err := runInstall(t, "--target", "claude")
+	require.ErrorContains(t, err, "claude plugin install")
+	require.Contains(t, out, "+ claude marketplace  (user scope)")
+	require.NotContains(t, out, "claude plugin  (user scope)")
 }
 
 func TestInstallCursorEndToEnd(t *testing.T) {
